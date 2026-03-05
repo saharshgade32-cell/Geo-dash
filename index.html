@@ -223,7 +223,7 @@
         </div>
 
         <div class="instructions">
-            ⬆️ CLICK OR SPACE TO JUMP | 🟩 GREEN = CLIMB | 🟥 RED = AVOID | 🔺 SPIKE = DEATH
+            ⬆️ DOUBLE JUMP | 🟩 GREEN = PLATFORM | 🟠 RED = STAND ON | 🔺 SPIKE = DEATH
         </div>
     </div>
 
@@ -256,8 +256,10 @@
             velocityY: 0,
             velocityX: 200,
             jumping: false,
+            jumpsLeft: 2,
             color: '#00ffff',
-            onPlatform: false
+            onPlatform: false,
+            onBlock: false
         };
 
         const gravity = 0.6;
@@ -280,8 +282,9 @@
         canvas.addEventListener('click', jump);
 
         function jump() {
-            if (gameRunning && !player.jumping && gameActive) {
+            if (gameRunning && gameActive && player.jumpsLeft > 0) {
                 player.velocityY = jumpStrength;
+                player.jumpsLeft--;
                 player.jumping = true;
             }
         }
@@ -348,6 +351,7 @@
                 player.y = groundLevel - player.height;
                 player.velocityY = 0;
                 player.jumping = false;
+                player.jumpsLeft = 2; // Reset jumps on ground
             }
 
             // Screen bounds
@@ -367,6 +371,7 @@
             }
 
             player.onPlatform = false;
+            player.onBlock = false;
 
             for (let i = 0; i < obstacles.length; i++) {
                 obstacles[i].x -= player.velocityX * (1 / 60);
@@ -377,22 +382,42 @@
                     score += 10;
                 }
 
-                // Platform logic - allow jumping on platforms
-                if (obstacles[i].climbable) {
-                    // Check if player is on top of platform
+                // Check if player can stand on top of this obstacle
+                const canStandOn = obstacles[i].type === 'platform' || 
+                                   obstacles[i].type === 'square' || 
+                                   obstacles[i].type === 'tall';
+
+                if (canStandOn) {
+                    // Check if player is on top of obstacle
                     if (player.velocityY >= 0 &&
-                        player.y + player.height <= obstacles[i].y + 10 &&
-                        player.y + player.height >= obstacles[i].y - 10 &&
-                        player.x + player.width > obstacles[i].x &&
-                        player.x < obstacles[i].x + obstacles[i].width) {
+                        player.y + player.height <= obstacles[i].y + 15 &&
+                        player.y + player.height >= obstacles[i].y - 15 &&
+                        player.x + player.width > obstacles[i].x + 5 &&
+                        player.x < obstacles[i].x + obstacles[i].width - 5) {
                         
                         player.y = obstacles[i].y - player.height;
                         player.velocityY = 0;
                         player.jumping = false;
-                        player.onPlatform = true;
+                        player.jumpsLeft = 2; // Reset jumps when landing on block
+                        
+                        if (obstacles[i].type === 'platform') {
+                            player.onPlatform = true;
+                        } else {
+                            player.onBlock = true;
+                        }
                     }
-                } else {
-                    // Regular collision detection - spikes and regular obstacles kill you
+                } 
+
+                // Spike collision - always deadly
+                if (obstacles[i].type === 'spike' || obstacles[i].type === 'spikes') {
+                    if (checkCollision(player, obstacles[i])) {
+                        endGame();
+                    }
+                }
+
+                // Regular block collision - deadly if not on top
+                if ((obstacles[i].type === 'square' || obstacles[i].type === 'tall') &&
+                    !player.onBlock) {
                     if (checkCollision(player, obstacles[i])) {
                         endGame();
                     }
